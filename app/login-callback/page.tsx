@@ -18,6 +18,11 @@ export default function Page(props: IPage) {
     FHIR.oauth2
       .ready()
       .then(async (client: Client) => {
+        console.log("client", client);
+
+        // Clear existing session storage before setting new patient data
+        sessionStorage.clear();
+
         // Save the fhirClient...
         appContext.setFhirClient(client);
 
@@ -34,12 +39,45 @@ export default function Page(props: IPage) {
         appContext.setIdToken(client.state.tokenResponse?.id_token ?? "");
 
         // Redirect to /patient-sphere/patient/patient-details...
-        const patient = client.request("Patient");
-        console.log(patient);
+
+        const patientId = client.patient.id;
+
+        const patient = await client.patient.read();
+        appContext.setPatient(patient);
+        console.log("patient", patient);
+
+        // Fetch multiple resource types for the patient
+        const resourceTypes = [
+          "AllergyIntolerance",
+          "Condition",
+          // "Medication",
+          // "MedicationRequest",
+          // "Observation",
+          // // "Procedure",
+          // "Immunization",
+        ];
+
+        const resourcePromises = resourceTypes.map((resourceType) =>
+          client.request(`${resourceType}?patient=${patientId}`)
+        );
+
+        try {
+          const responses = await Promise.all(resourcePromises);
+          const patientResources = responses.reduce((acc, response, index) => {
+            acc[resourceTypes[index]] = response.entry || [];
+            return acc;
+          }, {});
+
+          console.log("Patient Resources:", patientResources);
+          appContext.setPatientResource(patientResources);
+        } catch (error) {
+          console.error("Error fetching patient resources:", error);
+        }
+
         router.push("/patient-sphere/patient/patient-details");
       })
       .catch(console.error);
-  }, [appContext]);
+  }, []);
 
   return <div>Loading...</div>;
 }

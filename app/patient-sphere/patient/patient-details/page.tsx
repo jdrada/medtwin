@@ -1,57 +1,62 @@
 "use client";
 
-import React, { useState, useEffect, useContext } from "react";
-import * as r4 from "fhir/r4";
+import React, { useContext } from "react";
 import Head from "next/head";
 import { AppContext } from "@/lib/hooks/AppContext/AppContext";
+import AllergyDisplay from "@/components/allergy-display";
 
 export interface IPageProps {}
 export default function Page(props: IPageProps) {
   const appContext = useContext(AppContext);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [patient, setPatient] = useState<r4.Patient | undefined>(undefined);
 
-  console.log(patient);
+  const patient = appContext.patient;
+  const patientResource = appContext.patientResource;
 
-  useEffect(() => {
-    const load = async () => {
-      if (!appContext.accessToken) {
-        return;
-      }
-      if (!appContext.fhirClient) {
-        return;
-      }
-
-      setIsLoading(true);
-
-      // Get the patient...
-      const patientId = appContext.patientFhirId;
-      const patients = await appContext.fhirClient.request(
-        `Patient?_id=${patientId}`,
-        { flat: true }
-      );
-      const patient = patients[0] ?? null;
-      setPatient(patient);
-
-      // TODO: This is a bad way of doing it. Better to do it in the AppProvider, but this is ok for now...
-      if (patient !== null && appContext.patient === null) {
-        appContext.setPatient(patient);
-      }
-
-      setIsLoading(false);
-    };
-
-    load();
-  }, [setIsLoading, setPatient, appContext]);
+  if (!patient || !patientResource) {
+    return <div>No patient Data</div>;
+  }
 
   return (
     <div className="p-8">
       <Head>
-        <title>Patient Details</title>
+        <title>
+          {patient.name?.[0]?.given?.[0]} {patient.name?.[0]?.family} Digital
+          Clone
+        </title>
       </Head>
-      {isLoading && <div>Loading...</div>}
 
-      <pre>{JSON.stringify(patient, null, 2)}</pre>
+      <div>
+        <h1 className="text-2xl font-bold">Patient Details</h1>
+        <p>
+          <strong>Patient Name:</strong> {patient.name?.[0]?.given?.[0]}{" "}
+          {patient.name?.[0]?.family}
+        </p>
+        <p>
+          <strong>Sex:</strong> {patient.gender}
+        </p>
+        <p>
+          <strong>D.O.B.:</strong> {patient.birthDate}
+        </p>
+        <p>
+          <strong>Race:</strong>{" "}
+          {patient?.extension?.[0]?.extension?.[0]?.valueCoding?.display}
+          {", "}
+          {patient?.extension?.[0]?.extension?.[2]?.valueString}{" "}
+          {patient?.extension?.[0]?.extension?.[1]?.valueCoding?.display}
+        </p>
+        <p>
+          <strong>Ethnicity:</strong>{" "}
+          {patient?.extension?.[1]?.extension?.[0]?.valueCoding?.display}
+        </p>
+
+        <p>
+          <strong>Contact Info:</strong> {patient.telecom?.[0]?.value}
+        </p>
+      </div>
+
+      <AllergyDisplay allergy={patientResource.AllergyIntolerance} />
+
+      {/* <pre>{JSON.stringify(patient, null, 2)}</pre> */}
     </div>
   );
 }
